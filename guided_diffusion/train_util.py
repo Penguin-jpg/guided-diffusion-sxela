@@ -5,7 +5,6 @@ import os
 import blobfile as bf
 import torch as th
 import torch.distributed as dist
-from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 
 from . import logger
@@ -39,6 +38,7 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
+        use_webdataset=False,
     ):
         self.model = model
         self.diffusion = diffusion
@@ -59,6 +59,7 @@ class TrainLoop:
         self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
         self.weight_decay = weight_decay
         self.lr_anneal_steps = lr_anneal_steps
+        self.use_webdataset = use_webdataset
 
         self.step = 0
         self.resume_step = 0
@@ -149,7 +150,11 @@ class TrainLoop:
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
-            batch, cond = next(self.data)
+            cond = None
+            if not self.use_webdataset:
+                batch, cond = next(self.data)
+            else:
+                batch = next(self.data)
             self.run_step(batch, cond)
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
