@@ -1,10 +1,28 @@
 import math
 import random
+import webdataset as wds
 
 from PIL import Image
 import blobfile as bf
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
+import torchvision.transforms as T
+
+def _convert_image_to_rgb(image):
+    return image.convert("RGB")
+
+def _normalize_negative_one_and_one(image):
+    return image.mul(2).sub(1)
+
+def make_preprocess(image_size):
+    return T.Compose([
+            T.RandomHorizontalFlip(p=0.5),
+            T.CenterCrop(image_size),
+            _convert_image_to_rgb,
+            T.ToTensor(),
+            _normalize_negative_one_and_one,
+        ]
+    )
 
 
 def load_data(
@@ -60,6 +78,43 @@ def load_data(
         loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True
         )
+    while True:
+        yield from loader
+
+def load_webdata(
+    *,
+    urls_or_paths,
+    batch_size,
+    image_size,
+):
+    """
+    For a dataset, create a generator over (images, kwargs) pairs (unconditional).
+
+    Each images is an NCHW float tensor, and the kwargs dict contains zero or
+    more keys, each of which map to a batched Tensor of their own.
+
+    :param urls_or_paths: urls or paths for webdataset.
+    :param batch_size: the batch size of each returned pair.
+    :param image_size: the size to which images are resized.
+    """
+    if not urls_or_paths:
+        raise ValueError("unspecified data directory")
+
+    preprocess = make_preprocess(image_size)
+    dataset = wds.DataPipeline(
+            wds.SimpleShardList(urls_or_paths, seed=42),
+            wds.shuffle(100),
+            wds.split_by_worker,
+            wds.tarfile_to_samples(),
+            wds.shuffle(1000),
+            wds.decode("pil"),
+            wds.shuffle(10000),
+            wds.to_tuple("jpg;jpeg;png;gif"),
+            wds.map_tuple(preprocess, lambda x: x)
+        )
+    loader = DataLoader(
+        dataset, batch_size=batch_size, num_workers=1, drop_last=True
+    )
     while True:
         yield from loader
 
