@@ -8,21 +8,74 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 import torchvision.transforms as T
 
-def _convert_image_to_rgb(image):
-    return image.convert("RGB")
+def convert_image_to_rgb(pil_image):
+    return pil_image.convert("RGB")
 
-def _normalize_negative_one_and_one(image):
-    return image.mul(2).sub(1)
+def normalize_negative_one_and_one(pil_image):
+    return pil_image.mul(2).sub(1)
 
-def make_preprocess(image_size):
-    return T.Compose([
-            _convert_image_to_rgb,
-            T.RandomHorizontalFlip(p=0.5),
-            T.CenterCrop(image_size),
-            T.ToTensor(),
-            _normalize_negative_one_and_one,
-        ]
-    )
+def make_center_crop(image_size):
+    def center_crop(pil_image):
+        # We are not on a new enough PIL to support the `reducing_gap`
+        # argument, which uses BOX downsampling at powers of two first.
+        # Thus, we do it by hand to improve downsample quality.
+        while min(*pil_image.size) >= 2 * image_size:
+            pil_image = pil_image.resize(
+                tuple(x // 2 for x in pil_image.size), resample=Image.BOX
+            )
+
+        scale = image_size / min(*pil_image.size)
+        pil_image = pil_image.resize(
+            tuple(round(x * scale) for x in pil_image.size), resample=Image.BICUBIC
+        )
+
+        arr = np.array(pil_image)
+        crop_y = (arr.shape[0] - image_size) // 2
+        crop_x = (arr.shape[1] - image_size) // 2
+        return arr[crop_y : crop_y + image_size, crop_x : crop_x + image_size]
+    return center_crop
+
+
+def make_random_crop(image_size, min_crop_frac=0.8, max_crop_frac=1.0):
+    def random_crop(pil_image):
+        min_smaller_dim_size = math.ceil(image_size / max_crop_frac)
+        max_smaller_dim_size = math.ceil(image_size / min_crop_frac)
+        smaller_dim_size = random.randrange(min_smaller_dim_size, max_smaller_dim_size + 1)
+
+        # We are not on a new enough PIL to support the `reducing_gap`
+        # argument, which uses BOX downsampling at powers of two first.
+        # Thus, we do it by hand to improve downsample quality.
+        while min(*pil_image.size) >= 2 * smaller_dim_size:
+            pil_image = pil_image.resize(
+                tuple(x // 2 for x in pil_image.size), resample=Image.BOX
+            )
+
+        scale = smaller_dim_size / min(*pil_image.size)
+        pil_image = pil_image.resize(
+            tuple(round(x * scale) for x in pil_image.size), resample=Image.BICUBIC
+        )
+
+        arr = np.array(pil_image)
+        crop_y = random.randrange(arr.shape[0] - image_size + 1)
+        crop_x = random.randrange(arr.shape[1] - image_size + 1)
+        return arr[crop_y : crop_y + image_size, crop_x : crop_x + image_size]
+    return random_crop
+
+def make_preprocess(image_size, random_crop=False, random_flip=True):
+    preprocess = [convert_image_to_rgb]
+    if random_crop:
+        random_crop = make_random_crop(image_size)
+        preprocess.append(random_crop)
+    else:
+        center_crop = make_center_crop(image_size)
+        preprocess.append(center_crop)
+
+    preprocess.append(T.ToTensor())
+    if random_flip:
+        preprocess.append(T.RandomHorizontalFlip(p=0.5))
+
+    preprocess.append(normalize_negative_one_and_one)
+    return T.Compose(preprocess)
 
 
 def load_data(
@@ -86,9 +139,11 @@ def load_webdata(
     urls_or_paths,
     batch_size,
     image_size,
+    random_crop=False,
+    random_flip=True,
 ):
     """
-    For a dataset, create a generator over (images, kwargs) pairs (unconditional).
+    For a webdataset, create a generator over (images, kwargs) pairs (unconditional).
 
     Each images is an NCHW float tensor, and the kwargs dict contains zero or
     more keys, each of which map to a batched Tensor of their own.
@@ -96,11 +151,12 @@ def load_webdata(
     :param urls_or_paths: urls or paths for webdataset.
     :param batch_size: the batch size of each returned pair.
     :param image_size: the size to which images are resized.
+    :param random_crop: if True, randomly crop the images for augmentation.
+    :param random_flip: if True, randomly flip the images for augmentation.
     """
     if not urls_or_paths:
         raise ValueError("unspecified data directory")
-
-    preprocess = make_preprocess(image_size)
+    preprocess = make_preprocess(image_size, random_crop=random_crop, random_flip=random_flip)
     dataset = wds.DataPipeline(
             wds.SimpleShardList(urls_or_paths, seed=42),
             wds.shuffle(100),
@@ -110,7 +166,7 @@ def load_webdata(
             wds.decode("pil"),
             wds.shuffle(10000),
             wds.to_tuple("jpg;jpeg;png;gif"),
-            wds.map_tuple(preprocess, lambda x: x)
+            wds.map_tuple(preprocess)
         )
     loader = DataLoader(
         dataset, batch_size=batch_size, num_workers=1, drop_last=True
@@ -173,7 +229,6 @@ class ImageDataset(Dataset):
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
         return np.transpose(arr, [2, 0, 1]), out_dict
-
 
 def center_crop_arr(pil_image, image_size):
     # We are not on a new enough PIL to support the `reducing_gap`
