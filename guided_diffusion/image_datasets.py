@@ -159,18 +159,14 @@ def load_webdata(
     preprocess = make_preprocess(image_size, random_crop=random_crop, random_flip=random_flip)
     dataset = wds.DataPipeline(
             wds.SimpleShardList(urls_or_paths, seed=42),
-            wds.shuffle(100),
             wds.split_by_worker,
             wds.tarfile_to_samples(),
             wds.shuffle(1000),
             wds.decode("pil"),
-            wds.shuffle(10000),
             wds.to_tuple("jpg;jpeg;png;gif"),
             wds.map_tuple(preprocess)
         )
-    loader = DataLoader(
-        dataset, batch_size=batch_size, num_workers=1, drop_last=True
-    )
+    loader = wds.WebLoader(dataset, batch_size=batch_size, num_workers=1, drop_last=True).shuffle(1000)
     while True:
         yield from loader
 

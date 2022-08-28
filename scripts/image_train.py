@@ -84,7 +84,7 @@ def create_argparser():
         fp16_scale_growth=1e-3,
         logdir = '',
         use_webdataset=False,
-        urls_or_paths=None,
+        urls_or_paths="", # if you want to use brace expansion, remember to use single quote like this: '{00000..00005}'
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
