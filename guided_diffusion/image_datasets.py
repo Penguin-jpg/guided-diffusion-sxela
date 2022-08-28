@@ -16,9 +16,9 @@ def _normalize_negative_one_and_one(image):
 
 def make_preprocess(image_size):
     return T.Compose([
+            _convert_image_to_rgb,
             T.RandomHorizontalFlip(p=0.5),
             T.CenterCrop(image_size),
-            _convert_image_to_rgb,
             T.ToTensor(),
             _normalize_negative_one_and_one,
         ]
