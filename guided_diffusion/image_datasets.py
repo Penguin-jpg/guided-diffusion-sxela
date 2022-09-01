@@ -157,15 +157,7 @@ def load_webdata(
     if not urls_or_paths:
         raise ValueError("unspecified data directory")
     preprocess = make_preprocess(image_size, random_crop=random_crop, random_flip=random_flip)
-    dataset = wds.DataPipeline(
-            wds.SimpleShardList(urls_or_paths, seed=42),
-            wds.split_by_worker,
-            wds.tarfile_to_samples(),
-            wds.shuffle(1000),
-            wds.decode("pil"),
-            wds.to_tuple("jpg;jpeg;png;gif"),
-            wds.map_tuple(preprocess)
-        )
+    dataset = wds.WebDataset(urls_or_paths).shuffle(1000).decode("pil").to_tuple("jpg;jpeg;png;gif").map_tuple(preprocess)
     loader = wds.WebLoader(dataset, batch_size=batch_size, num_workers=1, drop_last=True).shuffle(1000)
     while True:
         yield from loader
