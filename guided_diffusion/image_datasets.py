@@ -77,6 +77,9 @@ def make_preprocess(image_size, random_crop=False, random_flip=True):
     preprocess.append(normalize_negative_one_and_one)
     return T.Compose(preprocess)
 
+def json_to_empty_dict(json_dict):
+    return {}
+
 
 def load_data(
     *,
@@ -157,7 +160,7 @@ def load_webdata(
     if not urls_or_paths:
         raise ValueError("unspecified data directory")
     preprocess = make_preprocess(image_size, random_crop=random_crop, random_flip=random_flip)
-    dataset = wds.WebDataset(urls_or_paths).shuffle(1000).decode("pil").to_tuple("jpg;jpeg;png;gif").map_tuple(preprocess)
+    dataset = wds.WebDataset(urls_or_paths).shuffle(1000).decode("pil").to_tuple("jpg;jpeg;png;gif", "json").map_tuple(preprocess, json_to_empty_dict)
     loader = wds.WebLoader(dataset, batch_size=batch_size, num_workers=1, drop_last=True).shuffle(1000)
     while True:
         yield from loader

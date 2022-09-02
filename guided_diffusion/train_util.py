@@ -150,11 +150,7 @@ class TrainLoop:
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
-            batch, cond = None, {}
-            if not self.use_webdataset:
-                batch, cond = next(self.data)
-            else:
-                batch, = next(self.data) # get image in tuple
+            batch, cond = next(self.data)
             self.run_step(batch, cond)
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
