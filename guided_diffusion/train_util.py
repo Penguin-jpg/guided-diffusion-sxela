@@ -38,7 +38,6 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
-        use_webdataset=False,
     ):
         self.model = model
         self.diffusion = diffusion
@@ -59,7 +58,6 @@ class TrainLoop:
         self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
         self.weight_decay = weight_decay
         self.lr_anneal_steps = lr_anneal_steps
-        self.use_webdataset = use_webdataset
 
         self.step = 0
         self.resume_step = 0

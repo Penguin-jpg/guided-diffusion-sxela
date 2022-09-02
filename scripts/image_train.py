@@ -63,7 +63,6 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
-        use_webdataset=args.use_webdataset,
     ).run_loop()
 
 
