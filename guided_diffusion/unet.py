@@ -562,12 +562,13 @@ class UNetModel(nn.Module):
             ),
         )
         self._feature_size += ch
+        print(input_block_chans)
 
         self.output_blocks = nn.ModuleList([])
         for level, mult in list(enumerate(channel_mult))[::-1]:
-            print(mult)
             for i in range(num_res_blocks + 1):
                 ich = input_block_chans.pop()
+                print(ich)
                 layers = [
                     ResBlock(
                         ch + ich,
