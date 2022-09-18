@@ -562,7 +562,6 @@ class UNetModel(nn.Module):
             ),
         )
         self._feature_size += ch
-        print(input_block_chans)
 
         self.output_blocks = nn.ModuleList([])
         for level, mult in list(enumerate(channel_mult))[::-1]:
@@ -611,6 +610,7 @@ class UNetModel(nn.Module):
                 self.output_blocks.append(TimestepEmbedSequential(*layers))
                 self._feature_size += ch
 
+        print(input_ch)
         self.out = nn.Sequential(
             normalization(ch),
             nn.SiLU(),
